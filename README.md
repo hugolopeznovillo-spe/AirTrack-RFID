@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AirTrack RFID — Sistema de Control de Equipaje
 
 Sistema completo de trazabilidad RFID de maletas y cajas en aeropuerto.  
@@ -156,3 +157,6 @@ python -m http.server 3000
 ```
 
 Para desarrollo sin Keycloak, usa el botón **"Modo demo"** en la pantalla de login.
+=======
+# AirTrack-RFID
+>>>>>>> 915e2a21f9ecd60e9d204bede6d4cfa69d1e4e8a
