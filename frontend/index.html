@@ -1,0 +1,1568 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AirTrack RFID — Control de Equipaje</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <!-- Keycloak JS se carga dinámicamente para usar el servidor configurado -->
+  <script>
+    window.KC_URL = localStorage.getItem("air_kc_url") || "/auth";
+    window.KC_REALM = localStorage.getItem("air_kc_realm") || "airport-rfid";
+    window.KC_CLIENT = localStorage.getItem("air_kc_client") || "rfid-frontend";
+  </script>
+
+  <style>
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --surface2:  #1c2128;
+      --surface3:  #21262d;
+      --border:    #30363d;
+      --border2:   #3d444d;
+      --text:      #e6edf3;
+      --muted:     #7d8590;
+      --dim:       #484f58;
+      --blue:      #2f81f7;
+      --blue2:     #58a6ff;
+      --teal:      #3fb950;
+      --yellow:    #d29922;
+      --orange:    #db6d28;
+      --red:       #f85149;
+      --purple:    #8957e5;
+      --cyan:      #79c0ff;
+      --stripe: repeating-linear-gradient(90deg,transparent,transparent 20px,rgba(47,129,247,.05) 20px,rgba(47,129,247,.05) 22px);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Barlow', sans-serif; font-size: 14px; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── Bulma dark overrides ── */
+    .navbar           { background: var(--surface) !important; border-bottom: 1px solid var(--border); }
+    .navbar-item, .navbar-link { color: var(--text) !important; }
+    .navbar-item:hover, .navbar-link:hover { background: var(--surface2) !important; }
+    .navbar-dropdown  { background: var(--surface2); border: 1px solid var(--border); border-top: none; }
+    .navbar-divider   { background: var(--border); }
+    .card             { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+    .card-header      { background: var(--surface2); border-bottom: 1px solid var(--border); border-radius: 8px 8px 0 0; box-shadow: none; }
+    .card-header-title{ color: var(--text); font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+    .card-content     { color: var(--text); }
+    .panel            { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+    .panel-heading    { background: var(--surface2); color: var(--text); border-bottom: 1px solid var(--border); font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; font-size: 13px; }
+    .panel-block      { color: var(--text); border-bottom-color: var(--border); }
+    .panel-block:hover{ background: var(--surface2); }
+    .tabs             { border-bottom-color: var(--border); }
+    .tabs li.is-active a { border-bottom-color: var(--blue); color: var(--blue2); }
+    .tabs a           { color: var(--muted); border-bottom-color: transparent; }
+    .tabs a:hover     { color: var(--text); border-bottom-color: var(--border2); }
+    .table            { background: transparent; color: var(--text); }
+    .table thead th   { color: var(--muted); background: var(--surface2); border-color: var(--border); font-family: 'Barlow Condensed', sans-serif; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; font-weight: 600; }
+    .table tbody tr   { background: transparent; border-color: var(--border); }
+    .table tbody td   { border-color: var(--border); color: var(--text); vertical-align: middle; }
+    .table tbody tr:hover td { background: var(--surface2); }
+    .table.is-striped tbody tr:nth-child(even) td { background: rgba(28,33,40,.5); }
+    .table-container  { border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
+    .table-container .table { margin-bottom: 0; }
+    .input, .select select, .textarea { background: var(--surface2); border-color: var(--border); color: var(--text); font-family: 'Barlow', sans-serif; }
+    .input:focus, .select select:focus { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(47,129,247,.2); }
+    .input::placeholder { color: var(--dim); }
+    .select::after { border-color: var(--muted); }
+    .select select option { background: var(--surface2); }
+    .label  { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+    .notification { background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
+    .notification.is-warning { background: rgba(210,153,34,.12); border-color: rgba(210,153,34,.3); color: #e3b341; }
+    .notification.is-danger  { background: rgba(248,81,73,.12);  border-color: rgba(248,81,73,.3);  color: #ff7b72; }
+    .notification.is-success { background: rgba(63,185,80,.12);  border-color: rgba(63,185,80,.3);  color: #56d364; }
+    .notification.is-info    { background: rgba(121,192,255,.12);border-color: rgba(121,192,255,.3);color: #79c0ff; }
+    .modal-card       { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+    .modal-card-head  { background: var(--surface2); border-bottom: 1px solid var(--border); }
+    .modal-card-title { color: var(--text); font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 700; }
+    .modal-card-body  { background: var(--surface); color: var(--text); }
+    .modal-card-foot  { background: var(--surface2); border-top: 1px solid var(--border); }
+    .delete           { background: var(--border2); }
+    .button.is-dark   { background: var(--surface2); color: var(--text); border-color: var(--border); }
+    .button.is-dark:hover { background: var(--surface3); }
+    ::-webkit-scrollbar       { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+    /* ── Auth screen ── */
+    #auth-screen {
+      position: fixed; inset: 0; z-index: 9999;
+      background: var(--bg);
+      background-image: var(--stripe);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .auth-card { width: 440px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .auth-header {
+      background: linear-gradient(135deg, #010409 0%, #0d1117 60%, #1a2332 100%);
+      padding: 32px 32px 24px; text-align: center; border-bottom: 1px solid var(--border); position: relative;
+    }
+    .auth-header::after { content:''; position:absolute; inset:0; background:repeating-linear-gradient(45deg,transparent,transparent 10px,rgba(47,129,247,.03) 10px,rgba(47,129,247,.03) 11px); pointer-events:none; }
+    .auth-logo { width:56px;height:56px;background:var(--blue);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;margin:0 auto 14px;position:relative;z-index:1;box-shadow:0 0 30px rgba(47,129,247,.4); }
+    .auth-title    { font-family:'Barlow Condensed',sans-serif; font-size:26px; font-weight:800; color:#fff; letter-spacing:1px; position:relative; z-index:1; }
+    .auth-subtitle { font-size:12px; color:var(--muted); margin-top:4px; position:relative; z-index:1; }
+    .auth-body     { padding:28px 32px 32px; }
+    .auth-status   { text-align:center; padding:16px; font-size:13px; color:var(--muted); display:flex; align-items:center; justify-content:center; gap:8px; }
+
+    /* ── App ── */
+    #app { display:none; }
+    #app.visible { display:block; }
+    .brand-logo { width:32px;height:32px;background:var(--blue);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff; }
+    .brand-name { font-family:'Barlow Condensed',sans-serif; font-size:20px; font-weight:800; color:#fff; letter-spacing:1px; }
+    .brand-sub  { font-size:10px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-top:-2px; }
+    .user-avatar { width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff; }
+
+    /* ── Runway hero ── */
+    .runway-hero {
+      background: linear-gradient(180deg,#010409 0%,#0d1117 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 24px;
+      position: relative; overflow: hidden;
+    }
+    .runway-hero::before {
+      content:''; position:absolute; bottom:0; left:0; right:0; height:2px;
+      background:repeating-linear-gradient(90deg,var(--yellow) 0,var(--yellow) 30px,transparent 30px,transparent 50px);
+      opacity:.6;
+    }
+    .runway-hero::after { content:''; position:absolute; inset:0; background:var(--stripe); pointer-events:none; }
+
+    /* ── Stat cards ── */
+    .stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+    .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px; position:relative; overflow:hidden; transition:border-color .2s,transform .2s; }
+    .stat-card:hover { border-color:var(--border2); transform:translateY(-2px); }
+    .stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+    .stat-card.c-blue::before   { background:var(--blue); }
+    .stat-card.c-green::before  { background:var(--teal); }
+    .stat-card.c-yellow::before { background:var(--yellow); }
+    .stat-card.c-red::before    { background:var(--red); }
+    .stat-card.c-purple::before { background:var(--purple); }
+    .stat-card.c-cyan::before   { background:var(--cyan); }
+    .stat-icon { font-size:20px; margin-bottom:6px; opacity:.8; }
+    .stat-card.c-blue .stat-icon   { color:var(--blue2); }
+    .stat-card.c-green .stat-icon  { color:var(--teal); }
+    .stat-card.c-yellow .stat-icon { color:var(--yellow); }
+    .stat-card.c-red .stat-icon    { color:var(--red); }
+    .stat-card.c-purple .stat-icon { color:var(--purple); }
+    .stat-card.c-cyan .stat-icon   { color:var(--cyan); }
+    .stat-val   { font-family:'Barlow Condensed',sans-serif; font-size:30px; font-weight:700; color:var(--text); line-height:1; }
+    .stat-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-top:3px; }
+
+    /* ── Tabs ── */
+    .app-tabs { padding:0 24px; background:var(--surface); border-bottom:1px solid var(--border); }
+    .app-tabs .tabs { margin-bottom:0; border-bottom:none; }
+    .app-tabs .tabs ul { border-bottom:none; }
+    .app-tabs .tabs li a { padding:12px 14px; font-size:13px; font-weight:500; gap:6px; }
+
+    /* ── Views ── */
+    .view { padding:20px 24px; display:none; }
+    .view.active { display:block; animation:fadeUp .2s ease; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
+
+    /* ── Scan ring ── */
+    .scan-ring { width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:32px;position:relative;flex-shrink:0;background:var(--surface2);border:2px solid var(--border);transition:all .3s; }
+    .scan-ring.scanning { color:var(--blue2);border-color:var(--blue);background:rgba(47,129,247,.08);animation:pulse 1.5s ease-in-out infinite; }
+    .scan-ring.idle     { color:var(--muted); }
+    .scan-ring.incident { color:var(--red);border-color:var(--red);background:rgba(248,81,73,.08); }
+    @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(47,129,247,.4)} 50%{box-shadow:0 0 0 16px rgba(47,129,247,0)} }
+
+    .scan-big-btn { width:100%;height:50px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:6px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .2s; }
+    .scan-big-btn.start { background:var(--blue);color:#fff; }
+    .scan-big-btn.start:hover { background:#388bfd;box-shadow:0 4px 20px rgba(47,129,247,.4); }
+    .scan-big-btn.stop  { background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.4); }
+    .scan-big-btn.stop:hover  { background:rgba(248,81,73,.25); }
+
+    /* ── Status tags ── */
+    .tag { font-family:'Barlow Condensed',sans-serif; font-weight:600; letter-spacing:.5px; }
+    .tag.t-checkin   { background:rgba(121,192,255,.15);color:var(--cyan);  border:1px solid rgba(121,192,255,.3); }
+    .tag.t-embarcado { background:rgba(47,129,247,.15); color:var(--blue2); border:1px solid rgba(47,129,247,.3); }
+    .tag.t-bodega    { background:rgba(210,153,34,.15); color:#e3b341;      border:1px solid rgba(210,153,34,.3); }
+    .tag.t-reclamado { background:rgba(63,185,80,.15);  color:#56d364;      border:1px solid rgba(63,185,80,.3); }
+    .tag.t-incidencia{ background:rgba(248,81,73,.15);  color:#ff7b72;      border:1px solid rgba(248,81,73,.3); }
+    .tag.t-perdido   { background:var(--red);color:#fff; }
+    .tag.t-vuelo     { background:rgba(79,192,255,.1);color:var(--cyan);font-family:'IBM Plex Mono',monospace;font-size:11px; }
+
+    /* ── Codes ── */
+    .epc  { font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--cyan); letter-spacing:1px; background:rgba(121,192,255,.08); padding:2px 6px; border-radius:3px; }
+    .flt  { font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:600; color:var(--yellow); letter-spacing:1px; }
+    .mono { font-family:'IBM Plex Mono',monospace; }
+
+    /* ── Bag type icon ── */
+    .bag-icon { width:34px;height:34px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0; }
+    .bag-icon.maleta  { background:rgba(47,129,247,.15); color:var(--blue2); }
+    .bag-icon.caja    { background:rgba(210,153,34,.15);  color:var(--yellow); }
+    .bag-icon.fragil  { background:rgba(248,81,73,.15);   color:var(--red); }
+    .bag-icon.exceso  { background:rgba(137,87,229,.15);  color:var(--purple); }
+
+    /* ── Flight board ── */
+    .flight-board { background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+    .flight-board-header { background:var(--surface2); padding:10px 16px; display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--border); font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+    .flight-row { display:grid; grid-template-columns:90px 70px 1fr 1fr 80px 90px 80px; gap:12px; padding:10px 16px; border-bottom:1px solid var(--border); align-items:center; cursor:pointer; transition:background .15s; }
+    .flight-row:last-child { border-bottom:none; }
+    .flight-row:hover { background:var(--surface2); }
+    .flight-row.hdr   { background:var(--surface2); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); font-weight:600; cursor:default; }
+    .flight-row.hdr:hover { background:var(--surface2); }
+
+    /* ── Journey timeline ── */
+    .journey { display:flex; align-items:center; overflow-x:auto; background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:12px 16px; gap:0; }
+    .j-step  { display:flex; flex-direction:column; align-items:center; min-width:80px; text-align:center; position:relative; }
+    .j-step+.j-step::before { content:''; position:absolute; left:-24px; top:15px; width:48px; height:2px; background:var(--border2); }
+    .j-step+.j-step.done::before { background:var(--teal); }
+    .j-dot { width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid var(--border2);background:var(--surface);color:var(--dim);margin-bottom:5px; }
+    .j-step.done   .j-dot { border-color:var(--teal);  color:var(--teal);  background:rgba(63,185,80,.1); }
+    .j-step.active .j-dot { border-color:var(--blue);  color:var(--blue2); background:rgba(47,129,247,.1); animation:pulse 1.5s ease-in-out infinite; }
+    .j-label { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+
+    /* ── Pending banner ── */
+    .pending-banner { background:rgba(210,153,34,.1); border:1px solid rgba(210,153,34,.3); border-radius:6px; padding:10px 16px; display:none; align-items:center; gap:12px; margin-bottom:14px; }
+    .pending-banner.visible { display:flex; }
+
+    /* ── Section title ── */
+    .stitle { font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:1.5px; color:var(--muted); display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+    .stitle::after { content:''; flex:1; height:1px; background:var(--border); }
+
+    /* ── Status dot ── */
+    .sdot { display:inline-block; width:8px; height:8px; border-radius:50%; }
+    .sdot.on  { background:var(--teal);   box-shadow:0 0 5px var(--teal); }
+    .sdot.off { background:var(--red); }
+
+    /* ── Toast ── */
+    #toasts { position:fixed; bottom:20px; right:20px; display:flex; flex-direction:column; gap:8px; z-index:8888; }
+    .toast { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:12px 16px; display:flex; align-items:center; gap:10px; font-size:13px; min-width:260px; animation:slideR .2s ease; box-shadow:0 4px 16px rgba(0,0,0,.4); }
+    .toast.ok   { border-left:3px solid var(--teal);   }
+    .toast.warn { border-left:3px solid var(--yellow); }
+    .toast.err  { border-left:3px solid var(--red);    }
+    .toast.ok   i { color:var(--teal); }
+    .toast.warn i { color:var(--yellow); }
+    .toast.err  i { color:var(--red); }
+    @keyframes slideR { from{transform:translateX(20px);opacity:0} to{transform:none;opacity:1} }
+
+    /* ── Detail modal ── */
+    .dl { margin-bottom:12px; }
+    .dl-label { font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); margin-bottom:2px; }
+    .dl-value { font-size:14px; color:var(--text); }
+
+    /* ── Progress bar in reports ── */
+    .progress { background: var(--border); }
+
+    /* ── Spinner ── */
+    .spin { animation:spinA .8s linear infinite; }
+    @keyframes spinA { to{transform:rotate(360deg)} }
+
+    /* ── Util ── */
+    .t-muted  { color:var(--muted); }
+    .t-green  { color:var(--teal); }
+    .t-red    { color:var(--red); }
+    .t-yellow { color:var(--yellow); }
+    .t-blue   { color:var(--blue2); }
+    .t-cyan   { color:var(--cyan); }
+    .t-purple { color:var(--purple); }
+  </style>
+</head>
+<body>
+
+<!-- ═══════ AUTH SCREEN ═══════════════════════════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-logo"><i class="fa-solid fa-plane-departure"></i></div>
+      <div class="auth-title">AIRTRACK RFID</div>
+      <div class="auth-subtitle">Sistema de Control de Equipaje · HT518-R501</div>
+    </div>
+    <div class="auth-body">
+      <div id="auth-status" class="auth-status">
+        <i class="fa-solid fa-circle-notch spin"></i>
+        <span id="auth-msg">Cargando Keycloak…</span>
+      </div>
+      <div id="auth-form" style="display:none">
+        <div class="notification is-info" style="font-size:12px;margin-bottom:14px;padding:10px 14px">
+          <i class="fa-solid fa-circle-info" style="margin-right:6px"></i>
+          Configura la URL de tu servidor Keycloak.
+        </div>
+        <div class="notification is-success" style="font-size:12px;margin-bottom:14px;padding:10px 14px">
+          <strong>Usuarios de acceso:</strong>
+          <ul style="margin:.5rem 0 0 1rem; padding-left:1rem;">
+            <li><strong>admin</strong> / admin123</li>
+            <li><strong>Hlopez</strong> / hlopez123</li>
+            <li><strong>Mvillegas</strong> / mvillegas123</li>
+          </ul>
+          <p style="margin-top:.6rem; color:#0b3d0b;">Estas credenciales ya están precargadas en Keycloak al iniciar el contenedor.</p>
+        </div>
+        <div class="field">
+          <label class="label">URL Keycloak</label>
+          <div class="control has-icons-left">
+            <input class="input" id="kc-url" type="text" value="/auth" />
+            <span class="icon is-left"><i class="fa-solid fa-server t-muted"></i></span>
+          </div>
+        </div>
+        <div class="columns is-variable is-2">
+          <div class="column">
+            <div class="field">
+              <label class="label">Realm</label>
+              <input class="input" id="kc-realm" type="text" value="airport-rfid" />
+            </div>
+          </div>
+          <div class="column">
+            <div class="field">
+              <label class="label">Client ID</label>
+              <input class="input" id="kc-client" type="text" value="rfid-frontend" />
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label">URL API Backend</label>
+          <input class="input" id="kc-api" type="text" value="/api/v1" />
+        </div>
+        <button class="button is-link is-fullwidth mt-3" onclick="doInitKeycloak()" style="height:44px;font-weight:700;font-family:'Barlow Condensed',sans-serif;font-size:15px;letter-spacing:1px">
+          <span class="icon"><i class="fa-solid fa-shield-halved"></i></span>
+          <span>INICIAR SESIÓN CON KEYCLOAK</span>
+        </button>
+        <div style="text-align:center;margin-top:10px">
+          <button class="button is-ghost" style="font-size:12px;color:var(--muted)" onclick="enterDemo()">
+            <i class="fa-solid fa-flask" style="margin-right:5px"></i> Modo demo (sin servidor)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ APP ══════════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- NAVBAR -->
+  <nav class="navbar" role="navigation">
+    <div class="navbar-brand">
+      <a class="navbar-item" style="gap:10px">
+        <div class="brand-logo"><i class="fa-solid fa-plane-departure"></i></div>
+        <div><div class="brand-name">AIRTRACK</div><div class="brand-sub">RFID Equipment</div></div>
+      </a>
+    </div>
+    <div class="navbar-menu">
+      <div class="navbar-start">
+        <div class="navbar-item" style="gap:6px">
+          <span class="sdot" id="api-dot"></span>
+          <span style="font-size:12px;color:var(--muted)" id="api-label">—</span>
+        </div>
+        <div class="navbar-item">
+          <span class="tag t-vuelo" id="reader-badge">HT518-R501</span>
+        </div>
+        <div class="navbar-item" id="nav-pending" style="display:none">
+          <span class="tag is-warning">
+            <i class="fa-solid fa-clock" style="margin-right:4px;font-size:10px"></i>
+            <span id="nav-pending-n">0</span> pendientes
+          </span>
+        </div>
+      </div>
+      <div class="navbar-end">
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" style="gap:10px">
+            <div class="user-avatar" id="u-avatar">?</div>
+            <div style="line-height:1.3">
+              <div style="font-size:13px;font-weight:600" id="u-name">—</div>
+              <div style="font-size:10px;color:var(--muted)" id="u-role">—</div>
+            </div>
+          </a>
+          <div class="navbar-dropdown is-right">
+            <a class="navbar-item" id="nav-admin-users" style="display:none" onclick="openUserAdmin()"><i class="fa-solid fa-user-plus" style="margin-right:8px;color:var(--muted)"></i>Crear usuario</a>
+            <a class="navbar-item" id="nav-admin-roles" style="display:none" onclick="openManageRolesModal()"><i class="fa-solid fa-person-chalkboard" style="margin-right:8px;color:var(--muted)"></i>Cambiar roles</a>
+          <a class="navbar-item" onclick="openCfg()"><i class="fa-solid fa-gear" style="margin-right:8px;color:var(--muted)"></i>Configuración</a>
+            <hr class="navbar-divider">
+            <a class="navbar-item" onclick="doLogout()" style="color:var(--red)"><i class="fa-solid fa-arrow-right-from-bracket" style="margin-right:8px"></i>Cerrar sesión</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <div class="runway-hero">
+    <div style="position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;letter-spacing:1px;color:#fff">
+          CONTROL DE EQUIPAJE
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px" id="hero-sub">
+          Lectura RFID de maletas y cajas · Terminal 2
+        </div>
+      </div>
+      <div class="stat-grid" id="stats-grid" style="flex:1;max-width:820px"></div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="app-tabs">
+    <div class="tabs is-boxed">
+      <ul>
+        <li class="is-active" data-tab="scan"      onclick="goTab('scan',this)">      <a><i class="fa fa-wifi"></i><span>Escáner</span></a></li>
+        <li data-tab="flights"   onclick="goTab('flights',this)">   <a><i class="fa fa-plane"></i><span>Vuelos</span></a></li>
+        <li data-tab="baggage"   onclick="goTab('baggage',this)">   <a><i class="fa fa-suitcase-rolling"></i><span>Equipaje</span></a></li>
+        <li data-tab="incidents" onclick="goTab('incidents',this)"> <a><i class="fa fa-triangle-exclamation"></i><span>Incidencias</span> <span class="tag is-danger is-small" id="inc-badge" style="margin-left:4px;display:none">0</span></a></li>
+        <li data-tab="reports"   onclick="goTab('reports',this)">   <a><i class="fa fa-chart-bar"></i><span>Informes</span></a></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ SCAN ══════════════════════════════════════════════════ -->
+  <div class="view active" id="view-scan">
+    <div class="pending-banner" id="pend-banner">
+      <i class="fa-solid fa-triangle-exclamation t-yellow"></i>
+      <span class="t-yellow" style="flex:1;font-size:12px"><strong id="pend-txt">0 piezas</strong> pendientes de sincronizar.</span>
+      <button class="button is-warning is-small" onclick="flushPending()"><i class="fa-solid fa-upload" style="margin-right:5px"></i>Enviar ahora</button>
+    </div>
+
+    <div class="columns is-variable is-3">
+      <!-- Left column -->
+      <div class="column is-4">
+        <div class="card mb-3">
+          <div class="card-header"><div class="card-header-title"><i class="fa fa-wifi t-blue" style="margin-right:6px"></i>Lector RFID</div></div>
+          <div class="card-content">
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+              <div class="scan-ring idle" id="scan-ring"><i class="fa-solid fa-broadcast-tower"></i></div>
+              <div>
+                <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700" id="scan-title">En espera</div>
+                <div style="font-size:12px;color:var(--muted)">HT518-R501 · Nation N611 / Impinj E710</div>
+                <div style="margin-top:5px"><span class="tag" id="scan-count-tag" style="background:rgba(63,185,80,.15);color:var(--teal);border:1px solid rgba(63,185,80,.3)">0 leídos</span></div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Vuelo</label>
+              <div class="control"><div class="select is-fullwidth"><select id="sel-flight"><option value="">— Sin vuelo —</option></select></div></div>
+            </div>
+            <div class="columns is-mobile is-variable is-2">
+              <div class="column">
+                <div class="field"><label class="label">Cinta</label><input class="input" id="sel-belt" type="text" placeholder="C1" /></div>
+              </div>
+              <div class="column">
+                <div class="field">
+                  <label class="label">Acción</label>
+                  <div class="control"><div class="select is-fullwidth"><select id="sel-action">
+                    <option value="CHECK-IN">CHECK-IN</option>
+                    <option value="EMBARCADO">EMBARCADO</option>
+                    <option value="EN BODEGA">EN BODEGA</option>
+                    <option value="RECLAMADO">RECLAMADO</option>
+                    <option value="INCIDENCIA">INCIDENCIA</option>
+                    <option value="PERDIDO">PERDIDO</option>
+                  </select></div></div>
+                </div>
+              </div>
+            </div>
+            <button class="scan-big-btn start" id="btn-scan" onclick="toggleScan()">
+              <i class="fa-solid fa-play" id="scan-icon"></i>
+              <span id="scan-label">INICIAR ESCANEO</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Manual EPC -->
+        <div class="card">
+          <div class="card-header"><div class="card-header-title"><i class="fa fa-keyboard t-muted" style="margin-right:6px"></i>Entrada Manual EPC</div></div>
+          <div class="card-content">
+            <div class="field">
+              <label class="label">Tipo de pieza</label>
+              <div class="control"><div class="select is-fullwidth"><select id="sel-type">
+                <option value="maleta">🧳 Maleta</option>
+                <option value="caja">📦 Caja</option>
+                <option value="fragil">⚠️ Frágil</option>
+                <option value="exceso">🏋️ Exceso de equipaje</option>
+              </select></div></div>
+            </div>
+            <div class="field">
+              <label class="label">Código EPC</label>
+              <input class="input mono" id="m-epc" type="text" placeholder="E2003412013F0100…"
+                     style="text-transform:uppercase;letter-spacing:1px;font-size:12px"
+                     onkeydown="if(event.key==='Enter')sendManual()" />
+            </div>
+            <div class="columns is-mobile is-variable is-2">
+              <div class="column">
+                <div class="field"><label class="label">Pasajero / Ref.</label><input class="input" id="m-pax" type="text" placeholder="GARCIA/JUAN" style="text-transform:uppercase;font-size:12px" /></div>
+              </div>
+              <div class="column">
+                <div class="field"><label class="label">RSSI (dBm)</label><input class="input" id="m-rssi" type="number" placeholder="-55" /></div>
+              </div>
+            </div>
+            <button class="button is-link is-fullwidth" onclick="sendManual()" style="font-weight:700;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;font-size:14px">
+              <i class="fa-solid fa-bolt" style="margin-right:6px"></i>REGISTRAR
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: scan table -->
+      <div class="column is-8">
+        <div class="card">
+          <div class="card-header" style="padding:0 16px">
+            <div class="card-header-title"><i class="fa fa-list-ul t-muted" style="margin-right:6px"></i>Lecturas de sesión</div>
+            <div style="display:flex;gap:8px;align-items:center;padding-right:12px">
+              <button class="button is-small is-dark" onclick="clearScans()" title="Limpiar"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+          </div>
+          <div style="overflow-x:auto;max-height:560px;overflow-y:auto">
+            <table class="table is-fullwidth is-hoverable is-striped">
+              <thead><tr>
+                <th>#</th><th>Tipo</th><th>EPC</th><th>Vuelo</th><th>Pasajero</th><th>Acción</th><th>RSSI</th><th>Hora</th>
+              </tr></thead>
+              <tbody id="scan-tbody">
+                <tr id="scan-empty"><td colspan="8" style="text-align:center;padding:44px;color:var(--dim)">
+                  <i class="fa-solid fa-broadcast-tower" style="font-size:26px;display:block;margin-bottom:10px;opacity:.3"></i>
+                  Sin lecturas. Inicia el escaneo o introduce un EPC.
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FLIGHTS ═══════════════════════════════════════════════ -->
+  <div class="view" id="view-flights">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800"><i class="fa fa-plane t-blue" style="margin-right:8px"></i>Vuelos del día</div>
+      <button class="button is-dark" onclick="loadFlights()"><i class="fa-solid fa-rotate" style="margin-right:6px"></i>Actualizar</button>
+    </div>
+    <div id="flights-content"><div class="t-muted" style="padding:40px;text-align:center"><i class="fa-solid fa-circle-notch spin" style="font-size:22px"></i></div></div>
+  </div>
+
+  <!-- ═══ BAGGAGE ════════════════════════════════════════════════ -->
+  <div class="view" id="view-baggage">
+    <div class="columns is-variable is-3">
+      <div class="column is-3">
+        <nav class="panel">
+          <p class="panel-heading"><i class="fa fa-filter" style="margin-right:6px"></i>Filtros</p>
+          <div class="panel-block" style="flex-direction:column;align-items:stretch;gap:8px;padding:12px">
+            <div class="field"><label class="label">Vuelo</label><div class="control"><div class="select is-fullwidth is-small"><select id="f-flight" onchange="loadBaggage()"><option value="">Todos</option></select></div></div></div>
+            <div class="field"><label class="label">Estado</label><div class="control"><div class="select is-fullwidth is-small"><select id="f-status" onchange="loadBaggage()">
+              <option value="">Todos</option><option value="CHECK-IN">CHECK-IN</option><option value="EMBARCADO">EMBARCADO</option>
+              <option value="EN BODEGA">EN BODEGA</option><option value="RECLAMADO">RECLAMADO</option>
+              <option value="INCIDENCIA">INCIDENCIA</option><option value="PERDIDO">PERDIDO</option>
+            </select></div></div></div>
+            <div class="field"><label class="label">Tipo</label><div class="control"><div class="select is-fullwidth is-small"><select id="f-type" onchange="loadBaggage()">
+              <option value="">Todos</option><option value="maleta">🧳 Maleta</option><option value="caja">📦 Caja</option>
+              <option value="fragil">⚠️ Frágil</option><option value="exceso">🏋️ Exceso</option>
+            </select></div></div></div>
+            <div class="field"><label class="label">EPC / Pasajero</label><input class="input is-small" id="f-q" type="text" placeholder="Buscar…" oninput="loadBaggage()" /></div>
+            <div class="field"><label class="label">Límite</label><div class="control"><div class="select is-fullwidth is-small"><select id="f-limit" onchange="loadBaggage()">
+              <option value="50">50</option><option value="100" selected>100</option><option value="200">200</option>
+            </select></div></div></div>
+            <button class="button is-link is-small is-fullwidth" onclick="loadBaggage()"><i class="fa fa-magnifying-glass" style="margin-right:5px"></i>Aplicar</button>
+          </div>
+        </nav>
+      </div>
+      <div class="column is-9">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800"><i class="fa fa-suitcase-rolling t-blue" style="margin-right:8px"></i>Equipaje registrado</div>
+          <button class="button is-dark" onclick="loadBaggage()"><i class="fa-solid fa-rotate"></i></button>
+        </div>
+        <div id="baggage-content"><div class="t-muted" style="padding:40px;text-align:center"><i class="fa-solid fa-circle-notch spin" style="font-size:22px"></i></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ INCIDENTS ══════════════════════════════════════════════ -->
+  <div class="view" id="view-incidents">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800"><i class="fa fa-triangle-exclamation t-red" style="margin-right:8px"></i>Incidencias activas</div>
+      <button class="button is-dark" onclick="loadIncidents()"><i class="fa-solid fa-rotate" style="margin-right:5px"></i>Actualizar</button>
+    </div>
+    <div id="inc-content"><div class="t-muted" style="padding:40px;text-align:center"><i class="fa-solid fa-circle-notch spin" style="font-size:22px"></i></div></div>
+  </div>
+
+  <!-- ═══ REPORTS ════════════════════════════════════════════════ -->
+  <div class="view" id="view-reports">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;margin-bottom:14px"><i class="fa fa-chart-bar t-purple" style="margin-right:8px"></i>Informes y métricas</div>
+    <div class="columns is-variable is-3">
+      <div class="column is-6">
+        <div class="card">
+          <div class="card-header"><div class="card-header-title"><i class="fa fa-suitcase-rolling t-blue" style="margin-right:6px"></i>Estados de equipaje</div></div>
+          <div class="card-content" id="rpt-status"></div>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="card">
+          <div class="card-header"><div class="card-header-title"><i class="fa fa-boxes-stacked t-yellow" style="margin-right:6px"></i>Tipos de pieza</div></div>
+          <div class="card-content" id="rpt-types"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card mt-0">
+      <div class="card-header"><div class="card-header-title"><i class="fa fa-timeline t-teal" style="margin-right:6px"></i>Actividad horaria — últimas 12h</div></div>
+      <div class="card-content" id="rpt-activity"></div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- ═══ BAG DETAIL MODAL ═══════════════════════════════════════ -->
+<div class="modal" id="bag-modal">
+  <div class="modal-background" onclick="closeBagModal()"></div>
+  <div class="modal-card" style="width:580px;max-width:96vw">
+    <header class="modal-card-head">
+      <p class="modal-card-title"><i class="fa-solid fa-suitcase t-blue" style="margin-right:8px"></i>Detalle de pieza</p>
+      <button class="delete" onclick="closeBagModal()"></button>
+    </header>
+    <section class="modal-card-body" id="bag-modal-body"></section>
+    <footer class="modal-card-foot" style="justify-content:flex-end">
+      <button class="button is-link" onclick="closeBagModal()">Cerrar</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ═══ CONFIG MODAL ════════════════════════════════════════════ -->
+<div class="modal" id="cfg-modal">
+  <div class="modal-background" onclick="closeCfg()"></div>
+  <div class="modal-card" style="width:500px;max-width:96vw">
+    <header class="modal-card-head">
+      <p class="modal-card-title"><i class="fa-solid fa-gear" style="margin-right:8px"></i>Configuración</p>
+      <button class="delete" onclick="closeCfg()"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="stitle">API Backend</div>
+      <div class="field"><label class="label">URL Base</label><input class="input" id="cfg-api" type="text" /></div>
+      <div class="field"><label class="label">Reader ID</label><input class="input" id="cfg-reader" type="text" /></div>
+      <div class="stitle mt-4">Keycloak</div>
+      <div class="field"><label class="label">URL Servidor</label><input class="input" id="cfg-kc-url" type="text" /></div>
+      <div class="columns is-variable is-2">
+        <div class="column"><div class="field"><label class="label">Realm</label><input class="input" id="cfg-kc-realm" type="text" /></div></div>
+        <div class="column"><div class="field"><label class="label">Client ID</label><input class="input" id="cfg-kc-client" type="text" /></div></div>
+      </div>
+    </section>
+    <footer class="modal-card-foot" style="justify-content:flex-end;gap:8px">
+      <button class="button" onclick="closeCfg()">Cancelar</button>
+      <button class="button is-link" onclick="saveCfg()"><i class="fa-solid fa-floppy-disk" style="margin-right:5px"></i>Guardar</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ═══ USER ADMIN MODAL ════════════════════════════════════════════ -->
+<div class="modal" id="user-modal">
+  <div class="modal-background" onclick="closeUserModal()"></div>
+  <div class="modal-card" style="width:520px;max-width:96vw">
+    <header class="modal-card-head">
+      <p class="modal-card-title"><i class="fa-solid fa-users-gear" style="margin-right:8px"></i>Crear usuario</p>
+      <button class="delete" onclick="closeUserModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="field"><label class="label">Usuario</label><input class="input" id="new-user-username" type="text" placeholder="usuario" /></div>
+      <div class="field"><label class="label">Contraseña</label><input class="input" id="new-user-password" type="password" placeholder="contraseña" /></div>
+      <div class="field"><label class="label">Email</label><input class="input" id="new-user-email" type="email" placeholder="usuario@dominio.local" /></div>
+      <div class="field"><label class="label">Nombre</label><input class="input" id="new-user-firstname" type="text" placeholder="Nombre" /></div>
+      <div class="field"><label class="label">Apellido</label><input class="input" id="new-user-lastname" type="text" placeholder="Apellido" /></div>
+      <div class="field"><label class="label">Rol</label>
+        <div class="control"><div class="select is-fullwidth"><select id="new-user-role">
+          <option value="viewer">viewer</option>
+          <option value="operator">operator</option>
+          <option value="admin">admin</option>
+        </select></div></div>
+      </div>
+    </section>
+    <footer class="modal-card-foot" style="justify-content:flex-end;gap:8px">
+      <button class="button" onclick="closeUserModal()">Cancelar</button>
+      <button class="button is-link" onclick="createUser()"><i class="fa-solid fa-user-plus" style="margin-right:5px"></i>Crear usuario</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ═══ MANAGE ROLES MODAL ═══════════════════════════════════════════ -->
+<div class="modal" id="manage-roles-modal">
+  <div class="modal-background" onclick="closeManageRolesModal()"></div>
+  <div class="modal-card" style="width:700px;max-width:96vw">
+    <header class="modal-card-head">
+      <p class="modal-card-title"><i class="fa-solid fa-person-chalkboard" style="margin-right:8px"></i>Cambiar roles de usuarios</p>
+      <button class="delete" onclick="closeManageRolesModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="table-container">
+        <table class="table is-fullwidth is-hoverable is-striped">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Email</th>
+              <th>Nombre</th>
+              <th>Rol actual</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="users-list-table">
+            <tr><td colspan="5" style="text-align:center;color:var(--muted)">Cargando usuarios...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <footer class="modal-card-foot" style="justify-content:flex-end;gap:8px">
+      <button class="button" onclick="closeManageRolesModal()">Cerrar</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ═══ CHANGE ROLE MODAL ════════════════════════════════════════════ -->
+<div class="modal" id="change-role-modal">
+  <div class="modal-background" onclick="closeChangeRoleModal()"></div>
+  <div class="modal-card" style="width:420px;max-width:96vw">
+    <header class="modal-card-head">
+      <p class="modal-card-title"><i class="fa-solid fa-shield" style="margin-right:8px"></i>Cambiar rol</p>
+      <button class="delete" onclick="closeChangeRoleModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="field">
+        <label class="label">Usuario</label>
+        <div class="control" id="change-role-user" style="color:var(--muted)">—</div>
+      </div>
+      <div class="field">
+        <label class="label">Nuevo rol</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="change-role-select">
+              <option value="viewer">viewer</option>
+              <option value="operator">operator</option>
+              <option value="admin">admin</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </section>
+    <footer class="modal-card-foot" style="justify-content:flex-end;gap:8px">
+      <button class="button" onclick="closeChangeRoleModal()">Cancelar</button>
+      <button class="button is-link" onclick="confirmChangeRole()"><i class="fa-solid fa-check" style="margin-right:5px"></i>Cambiar rol</button>
+    </footer>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CONFIG & STATE
+// ═══════════════════════════════════════════════════════════════════
+const LS = (k, def) => localStorage.getItem(k) || def;
+
+let cfg = {
+  api:      LS('air_api', '/api/v1'),
+  reader:   LS('air_reader', 'HT518-R501'),
+  kcUrl:    LS('air_kc_url', '/auth'),
+  kcRealm:  LS('air_kc_realm', 'airport-rfid'),
+  kcClient: LS('air_kc_client', 'rfid-frontend'),
+};
+
+let keycloak = null;
+let demo     = false;
+let token    = '';
+
+const S = {
+  scanning:   false,
+  scans:      [],    // session scans
+  scanCount:  0,
+  pending:    [],    // offline queue
+  flights:    [],
+  stats:      {},
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// KEYCLOAK BOOTSTRAP
+// ═══════════════════════════════════════════════════════════════════
+function loadKeycloakScript(url) {
+  const srcCandidates = [
+    `${url.replace(/\/$/, '')}/js/keycloak.js`,
+    `${url.replace(/\/$/, '')}/auth/js/keycloak.js`,
+    'https://cdn.jsdelivr.net/npm/keycloak-js@latest/dist/keycloak.min.js',
+  ];
+
+  return new Promise((resolve, reject) => {
+    let lastError = null;
+    const tryLoad = index => {
+      if (index >= srcCandidates.length) {
+        reject(lastError || new Error('No se pudo cargar keycloak.js'));
+        return;
+      }
+      const s = document.createElement('script');
+      s.src = srcCandidates[index];
+      s.onload = () => resolve();
+      s.onerror = e => {
+        lastError = e;
+        s.remove();
+        tryLoad(index + 1);
+      };
+      document.head.appendChild(s);
+    };
+    tryLoad(0);
+  });
+}
+
+async function doInitKeycloak() {
+  cfg.kcUrl    = document.getElementById('kc-url').value.trim();
+  cfg.kcRealm  = document.getElementById('kc-realm').value.trim();
+  cfg.kcClient = document.getElementById('kc-client').value.trim();
+  cfg.api      = document.getElementById('kc-api').value.trim();
+  persistCfg();
+  setAuthMsg('Cargando keycloak.js…', true);
+
+  try {
+    await loadKeycloakScript(cfg.kcUrl);
+  } catch {
+    setAuthMsg('No se pudo cargar keycloak.js. ¿Está Keycloak activo?', false);
+    document.getElementById('auth-form').style.display = 'block';
+    return;
+  }
+
+  keycloak = new Keycloak({ url: cfg.kcUrl, realm: cfg.kcRealm, clientId: cfg.kcClient });
+  setAuthMsg('Autenticando…', true);
+
+  keycloak.init({ onLoad: 'login-required', checkLoginIframe: false })
+    .then(auth => {
+      if (!auth) { setAuthMsg('Autenticación cancelada.', false); return; }
+      token = keycloak.token;
+      setupRefresh();
+      bootApp();
+    })
+    .catch(e => {
+      setAuthMsg('Error al conectar con Keycloak: ' + (e.error || e), false);
+      document.getElementById('auth-form').style.display = 'block';
+    });
+}
+
+function setupRefresh() {
+  setInterval(() => {
+    keycloak.updateToken(60)
+      .then(refreshed => { if (refreshed) token = keycloak.token; })
+      .catch(() => keycloak.login());
+  }, 45000);
+}
+
+function enterDemo() {
+  demo  = true;
+  token = 'DEMO';
+  bootApp();
+}
+
+function setAuthMsg(msg, spin) {
+  document.getElementById('auth-msg').textContent = msg;
+  const ic = document.getElementById('auth-status').querySelector('i');
+  ic.className = spin ? 'fa-solid fa-circle-notch spin' : 'fa-solid fa-circle-exclamation';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BOOT APP
+// ═══════════════════════════════════════════════════════════════════
+function bootApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+
+  // User info
+  const p = keycloak?.tokenParsed;
+  const name = p?.name || p?.preferred_username || (demo ? 'Demo User' : 'Usuario');
+  const roles = (p?.realm_access?.roles || []).map(r => String(r).toLowerCase());
+  const role  = ['admin','operator','viewer'].find(r => roles.includes(r)) || (demo ? 'operator' : 'viewer');
+  document.getElementById('u-name').textContent   = name;
+  document.getElementById('u-role').textContent   = role.toUpperCase();
+  document.getElementById('u-avatar').textContent = name[0].toUpperCase();
+  document.getElementById('reader-badge').textContent = cfg.reader;
+  document.getElementById('nav-admin-users').style.display = role === 'admin' ? 'block' : 'none';
+  document.getElementById('nav-admin-roles').style.display = role === 'admin' ? 'block' : 'none';
+
+  const scanTab = document.querySelector('[data-tab="scan"]');
+  if (role === 'viewer' && scanTab) {
+    scanTab.style.display = 'none';
+    goTab('flights', document.querySelector('[data-tab="flights"]'));
+  } else {
+    goTab('scan', scanTab);
+  }
+
+  loadStats();
+  loadFlights();
+
+  // Demo auto-scan
+  if (demo) setInterval(() => { if (S.scanning) autoScan(); }, 2500);
+}
+
+function openUserAdmin() {
+  document.getElementById('new-user-username').value = '';
+  document.getElementById('new-user-password').value = '';
+  document.getElementById('new-user-email').value = '';
+  document.getElementById('new-user-firstname').value = '';
+  document.getElementById('new-user-lastname').value = '';
+  document.getElementById('new-user-role').value = 'viewer';
+  document.getElementById('user-modal').classList.add('is-active');
+}
+
+function closeUserModal() {
+  document.getElementById('user-modal').classList.remove('is-active');
+}
+
+async function createUser() {
+  const username = document.getElementById('new-user-username').value.trim();
+  const password = document.getElementById('new-user-password').value;
+  const email = document.getElementById('new-user-email').value.trim();
+  const firstName = document.getElementById('new-user-firstname').value.trim();
+  const lastName = document.getElementById('new-user-lastname').value.trim();
+  const role = document.getElementById('new-user-role').value;
+
+  if (!username || !password) {
+    toast('Usuario y contraseña son obligatorios', 'warn');
+    return;
+  }
+
+  try {
+    await api('users', {
+      method: 'POST',
+      body: JSON.stringify({ username, password, email: email || undefined, firstName: firstName || undefined, lastName: lastName || undefined, role }),
+    });
+    toast(`Usuario '${username}' creado como ${role}`, 'ok');
+    closeUserModal();
+  } catch (err) {
+    toast(`Error creando usuario: ${err.message || err}`, 'err');
+  }
+}
+
+async function openManageRolesModal() {
+  document.getElementById('manage-roles-modal').classList.add('is-active');
+  await loadUsersList();
+}
+
+function closeManageRolesModal() {
+  document.getElementById('manage-roles-modal').classList.remove('is-active');
+}
+
+async function loadUsersList() {
+  try {
+    const users = await api('users');
+    renderUsersList(users);
+  } catch (err) {
+    toast(`Error cargando usuarios: ${err.message || err}`, 'err');
+  }
+}
+
+function renderUsersList(users) {
+  const tbody = document.getElementById('users-list-table');
+  if (!users || users.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted)">No hay usuarios</td></tr>';
+    return;
+  }
+
+  const roleColors = { admin: 'is-danger', operator: 'is-warning', viewer: 'is-info' };
+  tbody.innerHTML = users.map(u => `
+    <tr>
+      <td><strong>${u.username}</strong></td>
+      <td style="font-size:12px;color:var(--muted)">${u.email || '—'}</td>
+      <td style="font-size:12px">${u.firstName ? u.firstName + ' ' + (u.lastName || '') : '—'}</td>
+      <td><span class="tag ${roleColors[u.role] || 'is-dark'} is-small">${u.role}</span></td>
+      <td style="text-align:right"><button class="button is-small is-dark" onclick="openChangeRoleForUser('${u.username}', '${u.role}')" title="Cambiar rol"><i class="fa fa-pen"></i></button></td>
+    </tr>
+  `).join('');
+}
+
+function openChangeRoleForUser(username, currentRole) {
+  document.getElementById('change-role-user').textContent = username;
+  document.getElementById('change-role-select').value = currentRole;
+  document.getElementById('change-role-modal').classList.add('is-active');
+  window.selectedUserForRoleChange = username;
+}
+
+function closeChangeRoleModal() {
+  document.getElementById('change-role-modal').classList.remove('is-active');
+  window.selectedUserForRoleChange = null;
+}
+
+async function confirmChangeRole() {
+  const username = window.selectedUserForRoleChange;
+  const newRole = document.getElementById('change-role-select').value;
+
+  if (!username) {
+    toast('Error: usuario no seleccionado', 'err');
+    return;
+  }
+
+  try {
+    await api(`users/${username}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role: newRole }),
+    });
+    toast(`Rol de '${username}' actualizado a ${newRole}`, 'ok');
+    closeChangeRoleModal();
+    await loadUsersList();
+  } catch (err) {
+    toast(`Error actualizando rol: ${err.message || err}`, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// API HELPERS
+// ═══════════════════════════════════════════════════════════════════
+function hdrs() {
+  const h = { 'Content-Type': 'application/json' };
+  const t = keycloak?.token || token;
+  if (t && t !== 'DEMO') h['Authorization'] = `Bearer ${t}`;
+  return h;
+}
+
+async function api(path, opts = {}) {
+  const url = cfg.api.replace(/\/$/, '') + '/' + path.replace(/^\//, '');
+  const r = await fetch(url, { headers: hdrs(), ...opts });
+  if (!r.ok) {
+    const text = await r.text();
+    throw new Error(`HTTP ${r.status} — ${r.statusText}${text ? `: ${text}` : ''}`);
+  }
+  return r.json();
+}
+
+function setApiStatus(ok) {
+  document.getElementById('api-dot').className   = `sdot ${ok ? 'on' : 'off'}`;
+  document.getElementById('api-label').textContent = ok ? 'API conectada' : 'Modo demo';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════════════════════════════════
+async function loadStats() {
+  let s;
+  try {
+    s = await api('stats');
+    setApiStatus(true);
+  } catch {
+    s = { total:284, checkin:112, embarked:97, reclaimed:64, incidents:8, lost:3, flights:5, locations:7 };
+    setApiStatus(false);
+  }
+  S.stats = s;
+  renderStats(s);
+  updateIncBadge(s.incidents + s.lost);
+}
+
+function renderStats(s) {
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card c-blue">  <div class="stat-icon"><i class="fa-solid fa-suitcase-rolling"></i></div><div class="stat-val">${s.total}</div><div class="stat-label">Total piezas</div></div>
+    <div class="stat-card c-cyan">  <div class="stat-icon"><i class="fa-solid fa-ticket"></i></div><div class="stat-val">${s.checkin}</div><div class="stat-label">Check-in</div></div>
+    <div class="stat-card c-green"> <div class="stat-icon"><i class="fa-solid fa-plane-departure"></i></div><div class="stat-val">${s.embarked}</div><div class="stat-label">Embarcado</div></div>
+    <div class="stat-card c-yellow"><div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div><div class="stat-val">${s.reclaimed}</div><div class="stat-label">Reclamado</div></div>
+    <div class="stat-card c-red">   <div class="stat-icon"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="stat-val">${s.incidents}</div><div class="stat-label">Incidencias</div></div>
+    <div class="stat-card c-purple"><div class="stat-icon"><i class="fa-solid fa-circle-question"></i></div><div class="stat-val">${s.lost}</div><div class="stat-label">Perdidos</div></div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FLIGHTS
+// ═══════════════════════════════════════════════════════════════════
+const DEMO_FL = [
+  { id:1, code:'IB3456', dest:'MADRID (MAD)',    gate:'B22', belt:'C3', departure:'08:35', status:'EMBARQUE',  bags:142 },
+  { id:2, code:'VY1234', dest:'BARCELONA (BCN)', gate:'A14', belt:'C1', departure:'09:10', status:'CHECK-IN',  bags:89  },
+  { id:3, code:'FR9012', dest:'PARIS (CDG)',      gate:'C05', belt:'C4', departure:'10:00', status:'CERRADO',   bags:201 },
+  { id:4, code:'U24567', dest:'ROMA (FCO)',        gate:'B17', belt:'C2', departure:'11:25', status:'CHECK-IN',  bags:63  },
+  { id:5, code:'LH8901', dest:'BERLIN (BER)',      gate:'A03', belt:'C5', departure:'13:45', status:'PREVISTO', bags:0   },
+];
+const FL_STATUS_CLS = { EMBARQUE:'is-info', 'CHECK-IN':'is-link', CERRADO:'is-success', PREVISTO:'is-dark', INCIDENCIA:'is-danger' };
+
+async function loadFlights() {
+  let data;
+  try { data = await api('flights'); setApiStatus(true); }
+  catch { data = DEMO_FL; }
+  S.flights = data;
+  populateFltSelects(data);
+  renderFlights(data);
+}
+
+function populateFltSelects(flights) {
+  const opts = flights.map(f => `<option value="${f.id}">${f.code} — ${f.dest||''}</option>`).join('');
+  ['sel-flight','f-flight'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const v = el.value;
+    el.innerHTML = (id === 'f-flight' ? '<option value="">Todos los vuelos</option>' : '<option value="">— Sin vuelo —</option>') + opts;
+    el.value = v;
+  });
+}
+
+function renderFlights(flights) {
+  const el = document.getElementById('flights-content');
+  if (!flights.length) { el.innerHTML = emptyState('fa-plane-slash', 'Sin vuelos.'); return; }
+  el.innerHTML = `
+    <div class="flight-board">
+      <div class="flight-board-header"><i class="fa fa-tower-cell t-yellow" style="margin-right:6px"></i>
+        TABLERO — ${new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}
+      </div>
+      <div class="flight-row hdr"><span>Vuelo</span><span>Hora</span><span>Destino</span><span>Puerta · Cinta</span><span>Equipajes</span><span>Estado</span><span></span></div>
+      ${flights.map(f => `
+      <div class="flight-row" onclick="filterBagsByFlight(${f.id})">
+        <span class="flt">${f.code}</span>
+        <span style="font-size:13px">${f.departure||'—'}</span>
+        <span style="font-size:12px">${f.dest||'—'}</span>
+        <span style="font-size:12px;color:var(--muted)">${f.gate||'—'} · <span class="t-yellow">${f.belt||'—'}</span></span>
+        <span><span class="tag is-small" style="background:rgba(47,129,247,.15);color:var(--blue2);border:1px solid rgba(47,129,247,.2)">${f.bags??'—'}</span></span>
+        <span><span class="tag ${FL_STATUS_CLS[f.status]||'is-dark'} is-small">${f.status||'—'}</span></span>
+        <span><button class="button is-small is-dark" onclick="event.stopPropagation();filterBagsByFlight(${f.id})" title="Ver equipaje"><i class="fa fa-suitcase-rolling"></i></button></span>
+      </div>`).join('')}
+    </div>`;
+}
+
+function filterBagsByFlight(id) {
+  goTab('baggage', document.querySelector('[data-tab="baggage"]'));
+  document.getElementById('f-flight').value = id;
+  loadBaggage();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BAGGAGE
+// ═══════════════════════════════════════════════════════════════════
+const DEMO_BAGS = [
+  { id:1, epc:'E2003412013F0100B55E57C3', type:'maleta', flight_id:1, passenger:'GARCIA/JUAN',     action:'EMBARCADO',  rssi:-52,  created_at:'2026-04-20T07:12:00Z', flight_code:'IB3456' },
+  { id:2, epc:'E2003412013F0101C66F68D4', type:'caja',   flight_id:1, passenger:'MARTINEZ/ANA',    action:'EN BODEGA',  rssi:-61,  created_at:'2026-04-20T07:18:00Z', flight_code:'IB3456' },
+  { id:3, epc:'E2003412013F0102D77G79E5', type:'maleta', flight_id:2, passenger:'LOPEZ/PEDRO',     action:'CHECK-IN',   rssi:-48,  created_at:'2026-04-20T07:45:00Z', flight_code:'VY1234' },
+  { id:4, epc:'E2003412013F0103E88H80F6', type:'fragil', flight_id:2, passenger:'FERNANDEZ/MARTA', action:'CHECK-IN',   rssi:-55,  created_at:'2026-04-20T07:52:00Z', flight_code:'VY1234' },
+  { id:5, epc:'E2003412013F0104F99I91G7', type:'exceso', flight_id:3, passenger:'SANCHEZ/LUIS',    action:'RECLAMADO',  rssi:-59,  created_at:'2026-04-20T08:05:00Z', flight_code:'FR9012' },
+  { id:6, epc:'E2003412013F0105G00J02H8', type:'caja',   flight_id:3, passenger:'RUIZ/ELENA',      action:'INCIDENCIA', rssi:-70,  created_at:'2026-04-20T08:10:00Z', flight_code:'FR9012' },
+  { id:7, epc:'E2003412013F0106H11K13I9', type:'maleta', flight_id:1, passenger:'MORENO/CARLOS',   action:'PERDIDO',    rssi:null, created_at:'2026-04-20T06:30:00Z', flight_code:'IB3456' },
+];
+
+const TYPE_ICO = { maleta:'🧳', caja:'📦', fragil:'⚠️', exceso:'🏋️' };
+const STS_CLS  = { 'CHECK-IN':'t-checkin','EMBARCADO':'t-embarcado','EN BODEGA':'t-bodega','RECLAMADO':'t-reclamado','INCIDENCIA':'t-incidencia','PERDIDO':'t-perdido' };
+
+async function loadBaggage() {
+  const fl  = document.getElementById('f-flight').value;
+  const st  = document.getElementById('f-status').value;
+  const tp  = document.getElementById('f-type').value;
+  const q   = (document.getElementById('f-q').value || '').toLowerCase();
+  const lim = document.getElementById('f-limit').value;
+
+  let path = `scans?limit=${lim}`;
+  if (fl) path += `&flight_id=${fl}`;
+  if (st) path += `&action=${encodeURIComponent(st)}`;
+  if (tp) path += `&type=${tp}`;
+
+  let bags;
+  try { bags = await api(path); setApiStatus(true); }
+  catch { bags = DEMO_BAGS; }
+
+  if (q) bags = bags.filter(b => (b.epc||'').toLowerCase().includes(q) || (b.passenger||'').toLowerCase().includes(q));
+
+  renderBagTable(bags);
+}
+
+function renderBagTable(bags) {
+  const el = document.getElementById('baggage-content');
+  if (!bags.length) { el.innerHTML = emptyState('fa-suitcase-rolling', 'Sin resultados.'); return; }
+  el.innerHTML = `
+    <div class="table-container">
+      <table class="table is-fullwidth is-hoverable is-striped">
+        <thead><tr><th>Tipo</th><th>EPC</th><th>Vuelo</th><th>Pasajero</th><th>Estado</th><th>RSSI</th><th>Hora</th><th></th></tr></thead>
+        <tbody>${bags.map(b => {
+          const fl = S.flights.find(f => f.id == b.flight_id);
+          return `<tr>
+            <td title="${b.type}"><div class="bag-icon ${b.type||'caja'}">${TYPE_ICO[b.type]||'📦'}</div></td>
+            <td><span class="epc">${(b.epc||'').substring(0,12)}…</span></td>
+            <td><span class="flt">${fl?.code||b.flight_code||'—'}</span></td>
+            <td style="font-size:12px">${b.passenger||'—'}</td>
+            <td><span class="tag ${STS_CLS[b.action]||''} is-small">${b.action||'—'}</span></td>
+            <td class="t-muted" style="font-size:12px">${b.rssi!=null?b.rssi+' dBm':'—'}</td>
+            <td class="t-muted" style="font-size:11px">${b.created_at?new Date(b.created_at).toLocaleTimeString('es-ES'):'—'}</td>
+            <td><button class="button is-small is-dark" onclick='openBagModal(${JSON.stringify(b).replace(/'/g,"\\'")})'><i class="fa fa-eye"></i></button></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INCIDENTS
+// ═══════════════════════════════════════════════════════════════════
+async function loadIncidents() {
+  let items;
+  try {
+    const [inc, lost] = await Promise.all([
+      api('scans?action=INCIDENCIA&limit=100'),
+      api('scans?action=PERDIDO&limit=100'),
+    ]);
+    items = [...inc, ...lost];
+    setApiStatus(true);
+  } catch {
+    items = DEMO_BAGS.filter(b => ['INCIDENCIA','PERDIDO'].includes(b.action));
+  }
+  renderIncidents(items);
+  updateIncBadge(items.length);
+}
+
+function renderIncidents(items) {
+  const el = document.getElementById('inc-content');
+  if (!items.length) {
+    el.innerHTML = `<div class="notification is-success"><i class="fa fa-check-circle" style="margin-right:8px"></i>Sin incidencias activas. ¡Todo en orden!</div>`;
+    return;
+  }
+  el.innerHTML = items.map(b => {
+    const fl = S.flights.find(f => f.id == b.flight_id);
+    const lost = b.action === 'PERDIDO';
+    return `
+    <div class="notification ${lost?'is-danger':'is-warning'}" style="display:flex;align-items:center;gap:14px;padding:12px 16px;margin-bottom:8px;cursor:pointer"
+         onclick='openBagModal(${JSON.stringify(b).replace(/'/g,"\\'")})'>
+      <span style="font-size:24px">${TYPE_ICO[b.type]||'📦'}</span>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:14px">${lost?'⛔ PERDIDO':'⚠️ INCIDENCIA'} — <span class="mono">${b.epc||'—'}</span></div>
+        <div style="font-size:12px;margin-top:2px">Pasajero: <strong>${b.passenger||'—'}</strong> · Vuelo: <strong>${fl?.code||b.flight_code||'—'}</strong></div>
+      </div>
+      <button class="button is-small ${lost?'is-danger':'is-warning'}" onclick="event.stopPropagation();resolveIncident(${b.id})">
+        <i class="fa fa-check" style="margin-right:4px"></i>Resolver
+      </button>
+    </div>`;
+  }).join('');
+}
+
+async function resolveIncident(id) {
+  try {
+    await api(`scans/${id}`, { method: 'DELETE' });
+    toast('Incidencia resuelta', 'ok');
+  } catch {
+    toast('Marcada como resuelta (demo)', 'ok');
+  }
+  loadIncidents();
+  loadStats();
+}
+
+function updateIncBadge(n) {
+  const b = document.getElementById('inc-badge');
+  b.textContent = n;
+  b.style.display = n > 0 ? '' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// REPORTS
+// ═══════════════════════════════════════════════════════════════════
+function loadReports() {
+  const s = S.stats;
+
+  // Status bars
+  document.getElementById('rpt-status').innerHTML = [
+    ['CHECK-IN',  s.checkin,   '#79c0ff'],
+    ['EMBARCADO', s.embarked,  '#2f81f7'],
+    ['RECLAMADO', s.reclaimed, '#3fb950'],
+    ['INCIDENCIA',s.incidents, '#d29922'],
+    ['PERDIDO',   s.lost,      '#f85149'],
+  ].map(([label, val, color]) => {
+    const pct = s.total ? Math.round(val/s.total*100) : 0;
+    return `<div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+        <span class="t-muted" style="font-weight:600;letter-spacing:.5px">${label}</span>
+        <span>${val} <span class="t-muted">(${pct}%)</span></span>
+      </div>
+      <progress class="progress is-small" value="${pct}" max="100" style="--bulma-progress-bar-background-color:${color}">${pct}%</progress>
+    </div>`;
+  }).join('');
+
+  // Type counts from session scans
+  const tc = { maleta:0, caja:0, fragil:0, exceso:0 };
+  S.scans.forEach(s => { if (tc[s.type]!=null) tc[s.type]++; });
+  const tColors = { maleta:'#2f81f7', caja:'#d29922', fragil:'#f85149', exceso:'#8957e5' };
+  document.getElementById('rpt-types').innerHTML = Object.entries(tc).map(([k,v]) => `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <span style="font-size:20px">${TYPE_ICO[k]}</span>
+      <span style="flex:1;font-size:13px;text-transform:capitalize">${k}</span>
+      <span style="font-size:20px;font-weight:700;font-family:'Barlow Condensed',sans-serif;color:${tColors[k]}">${v}</span>
+    </div>`).join('');
+
+  // Hourly activity
+  const hours = Array.from({length:12}, (_,i) => {
+    const h = new Date();
+    h.setHours(h.getHours()-11+i, 0, 0, 0);
+    return { label: h.getHours()+':00', val: Math.floor(Math.random()*40) };
+  });
+  const maxV = Math.max(...hours.map(h => h.val), 1);
+  document.getElementById('rpt-activity').innerHTML = `
+    <div style="display:flex;align-items:flex-end;gap:6px;height:80px">
+      ${hours.map(h => `
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+          <div title="${h.val} scans" style="width:100%;background:rgba(47,129,247,.6);border-radius:3px 3px 0 0;height:${Math.round(h.val/maxV*64)}px;min-height:2px"></div>
+          <span style="font-size:9px;color:var(--dim)">${h.label}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCAN LOGIC
+// ═══════════════════════════════════════════════════════════════════
+function toggleScan() {
+  S.scanning = !S.scanning;
+  const ring  = document.getElementById('scan-ring');
+  const btn   = document.getElementById('btn-scan');
+  const icon  = document.getElementById('scan-icon');
+  const label = document.getElementById('scan-label');
+  const title = document.getElementById('scan-title');
+  if (S.scanning) {
+    ring.className  = 'scan-ring scanning';
+    btn.className   = 'scan-big-btn stop';
+    icon.className  = 'fa-solid fa-stop';
+    label.textContent = 'DETENER ESCANEO';
+    title.textContent = 'Escaneando…';
+    toast('Escaneo iniciado', 'ok');
+  } else {
+    ring.className  = 'scan-ring idle';
+    btn.className   = 'scan-big-btn start';
+    icon.className  = 'fa-solid fa-play';
+    label.textContent = 'INICIAR ESCANEO';
+    title.textContent = 'En espera';
+    toast('Escaneo detenido', 'warn');
+  }
+}
+
+const DEMO_EPCS = [
+  ['E2003412013F0200A11B22C33', 'maleta',  'GOMEZ/ROSA'],
+  ['E2003412013F0201B22C33D44', 'caja',    'JIMENEZ/TOMAS'],
+  ['E2003412013F0202C33D44E55', 'maleta',  'ALVAREZ/CARMEN'],
+  ['E2003412013F0203D44E55F66', 'fragil',  'ROMERO/PACO'],
+  ['E2003412013F0204E55F66G77', 'exceso',  'TORRES/BEATRIZ'],
+  ['E2003412013F0205F66G77H88', 'maleta',  'VEGA/MIGUEL'],
+];
+let demoIdx = 0;
+
+function autoScan() {
+  const [epc, type, pax] = DEMO_EPCS[demoIdx++ % DEMO_EPCS.length];
+  processScan({ epc, type, passenger: pax, rssi: -45 - Math.floor(Math.random()*30) });
+}
+
+async function sendManual() {
+  const epc  = document.getElementById('m-epc').value.trim().toUpperCase();
+  const pax  = document.getElementById('m-pax').value.trim().toUpperCase();
+  const rssi = parseFloat(document.getElementById('m-rssi').value) || null;
+  const type = document.getElementById('sel-type').value;
+  if (!epc) { toast('Introduce un código EPC', 'warn'); return; }
+  await processScan({ epc, type, passenger: pax, rssi });
+  document.getElementById('m-epc').value  = '';
+  document.getElementById('m-pax').value  = '';
+  document.getElementById('m-rssi').value = '';
+}
+
+async function processScan({ epc, type = 'maleta', passenger = '', rssi = null }) {
+  const fid    = document.getElementById('sel-flight').value || null;
+  const belt   = document.getElementById('sel-belt').value || '';
+  const action = document.getElementById('sel-action').value;
+  const fl     = S.flights.find(f => f.id == fid);
+
+  const entry = { epc, type, passenger, rssi, action, flight_id: fid, flight_code: fl?.code||'—', belt, created_at: new Date().toISOString(), _pending: false };
+
+  try {
+    const saved = await api('scans', { method: 'POST', body: JSON.stringify({
+      epc, type, reader_id: cfg.reader,
+      flight_id: fid ? parseInt(fid) : null,
+      passenger: passenger || null, belt: belt || null,
+      action, rssi
+    })});
+    Object.assign(entry, saved, { _pending: false });
+    setApiStatus(true);
+    if (S.pending.length) flushPending();
+  } catch {
+    entry._pending = true;
+    S.pending.push({ epc, type, reader_id: cfg.reader, flight_id: fid ? parseInt(fid) : null, passenger, belt, action, rssi });
+    updatePendingUI();
+  }
+
+  S.scans.unshift(entry);
+  if (S.scans.length > 200) S.scans.pop();
+  S.scanCount++;
+
+  document.getElementById('scan-count-tag').textContent = `${S.scanCount} leídos`;
+  prependRow(entry, S.scanCount);
+
+  if (action === 'INCIDENCIA' || action === 'PERDIDO') {
+    toast(`⚠️ ${action}: ${epc.substring(0,10)}…`, 'err');
+    const ring = document.getElementById('scan-ring');
+    ring.className = 'scan-ring incident';
+    setTimeout(() => { ring.className = S.scanning ? 'scan-ring scanning' : 'scan-ring idle'; }, 2000);
+    loadStats();
+  }
+}
+
+function prependRow(s, idx) {
+  const tbody = document.getElementById('scan-tbody');
+  document.getElementById('scan-empty')?.remove();
+  const fl = S.flights.find(f => f.id == s.flight_id);
+  const tr = document.createElement('tr');
+  tr.style.animation = 'fadeUp .2s ease';
+  if (s._pending) tr.style.opacity = '.65';
+  tr.innerHTML = `
+    <td class="t-muted">${idx}</td>
+    <td title="${s.type}"><div class="bag-icon ${s.type||'maleta'}" style="display:inline-flex">${TYPE_ICO[s.type]||'📦'}</div></td>
+    <td><span class="epc">${s.epc.substring(0,12)}…</span></td>
+    <td><span class="flt">${fl?.code||s.flight_code||'—'}</span></td>
+    <td style="font-size:12px">${s.passenger||'—'}</td>
+    <td>
+      <span class="tag ${STS_CLS[s.action]||''} is-small">${s.action}</span>
+      ${s._pending ? '<span class="tag is-warning is-small" style="margin-left:3px;font-size:9px">PENDIENTE</span>' : ''}
+    </td>
+    <td class="t-muted" style="font-size:12px">${s.rssi!=null?s.rssi+' dBm':'—'}</td>
+    <td class="t-muted" style="font-size:11px">${new Date(s.created_at).toLocaleTimeString('es-ES')}</td>
+  `;
+  tbody.insertBefore(tr, tbody.firstChild);
+}
+
+function clearScans() {
+  S.scans = []; S.scanCount = 0;
+  document.getElementById('scan-count-tag').textContent = '0 leídos';
+  document.getElementById('scan-tbody').innerHTML = `
+    <tr id="scan-empty"><td colspan="8" style="text-align:center;padding:44px;color:var(--dim)">
+      <i class="fa-solid fa-broadcast-tower" style="font-size:26px;display:block;margin-bottom:10px;opacity:.3"></i>
+      Sin lecturas.
+    </td></tr>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PENDING QUEUE
+// ═══════════════════════════════════════════════════════════════════
+async function flushPending() {
+  if (!S.pending.length) return;
+  try {
+    await api('scans/batch', { method: 'POST', body: JSON.stringify({ scans: S.pending }) });
+    toast(`${S.pending.length} pieza(s) sincronizadas`, 'ok');
+    S.pending = [];
+    updatePendingUI();
+    S.scans.forEach(s => s._pending = false);
+  } catch { toast('Sin conexión. Se reintentará.', 'warn'); }
+}
+
+function updatePendingUI() {
+  const n = S.pending.length;
+  document.getElementById('pend-banner').classList.toggle('visible', n > 0);
+  document.getElementById('pend-txt').textContent = `${n} pieza${n!==1?'s':''}`;
+  const navPend = document.getElementById('nav-pending');
+  navPend.style.display = n > 0 ? '' : 'none';
+  document.getElementById('nav-pending-n').textContent = n;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BAG DETAIL MODAL
+// ═══════════════════════════════════════════════════════════════════
+function openBagModal(b) {
+  const fl = S.flights.find(f => f.id == b.flight_id);
+  const JOURNEY = [
+    { label:'CHECK-IN',  icon:'fa-ticket'         },
+    { label:'EMBARCADO', icon:'fa-plane-departure' },
+    { label:'EN BODEGA', icon:'fa-box'             },
+    { label:'ATERRIZÓ',  icon:'fa-plane-arrival'   },
+    { label:'RECLAMADO', icon:'fa-check-circle'    },
+  ];
+  const steps = ['CHECK-IN','EMBARCADO','EN BODEGA','ATERRIZÓ','RECLAMADO'];
+  const curIdx = steps.indexOf(b.action);
+
+  const journeyHtml = JOURNEY.map((step, i) => {
+    const done   = i < curIdx;
+    const active = i === curIdx;
+    return `<div class="j-step ${done?'done':active?'active':''}">
+      <div class="j-dot"><i class="fa-solid ${step.icon}"></i></div>
+      <div class="j-label">${step.label}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('bag-modal-body').innerHTML = `
+    <div class="columns is-variable is-4">
+      <div class="column is-5">
+        <div style="text-align:center;padding:20px;background:var(--surface2);border-radius:8px;margin-bottom:14px">
+          <div style="font-size:60px">${TYPE_ICO[b.type]||'📦'}</div>
+          <div style="margin-top:8px"><span class="tag ${STS_CLS[b.action]||''}">${b.action||'—'}</span></div>
+        </div>
+        <div class="dl"><div class="dl-label">EPC</div><div class="epc" style="font-size:11px;word-break:break-all">${b.epc||'—'}</div></div>
+        <div class="dl"><div class="dl-label">Tipo</div><div class="dl-value" style="text-transform:capitalize">${b.type||'—'}</div></div>
+        <div class="dl"><div class="dl-label">RSSI</div><div class="dl-value t-muted">${b.rssi!=null?b.rssi+' dBm':'—'}</div></div>
+        <div class="dl"><div class="dl-label">Reader ID</div><div class="dl-value mono" style="font-size:12px">${b.reader_id||cfg.reader}</div></div>
+      </div>
+      <div class="column is-7">
+        <div class="dl"><div class="dl-label">Pasajero / Ref.</div><div class="dl-value">${b.passenger||'—'}</div></div>
+        <div class="dl"><div class="dl-label">Vuelo</div><div class="dl-value flt">${fl?.code||b.flight_code||'—'}</div></div>
+        <div class="dl"><div class="dl-label">Cinta</div><div class="dl-value">${b.belt||'—'}</div></div>
+        <div class="dl"><div class="dl-label">Registrado</div><div class="dl-value" style="font-size:13px">${b.created_at?new Date(b.created_at).toLocaleString('es-ES'):'—'}</div></div>
+        <div class="dl" style="margin-top:16px"><div class="dl-label">Recorrido</div><div style="margin-top:8px"><div class="journey">${journeyHtml}</div></div></div>
+        ${['INCIDENCIA','PERDIDO'].includes(b.action) ? `
+        <div class="notification is-danger" style="margin-top:14px;font-size:13px;padding:10px 14px">
+          <i class="fa fa-triangle-exclamation" style="margin-right:6px"></i>
+          <strong>${b.action==='PERDIDO'?'Equipaje no localizado':'Incidencia activa'}</strong>. Equipo de handling notificado.
+        </div>` : ''}
+      </div>
+    </div>`;
+  document.getElementById('bag-modal').classList.add('is-active');
+}
+function closeBagModal() { document.getElementById('bag-modal').classList.remove('is-active'); }
+
+// ═══════════════════════════════════════════════════════════════════
+// CONFIG MODAL
+// ═══════════════════════════════════════════════════════════════════
+function openCfg() {
+  document.getElementById('cfg-api').value      = cfg.api;
+  document.getElementById('cfg-reader').value   = cfg.reader;
+  document.getElementById('cfg-kc-url').value   = cfg.kcUrl;
+  document.getElementById('cfg-kc-realm').value = cfg.kcRealm;
+  document.getElementById('cfg-kc-client').value= cfg.kcClient;
+  document.getElementById('cfg-modal').classList.add('is-active');
+}
+function closeCfg() { document.getElementById('cfg-modal').classList.remove('is-active'); }
+function saveCfg() {
+  cfg.api      = document.getElementById('cfg-api').value.trim();
+  cfg.reader   = document.getElementById('cfg-reader').value.trim() || 'HT518-R501';
+  cfg.kcUrl    = document.getElementById('cfg-kc-url').value.trim();
+  cfg.kcRealm  = document.getElementById('cfg-kc-realm').value.trim();
+  cfg.kcClient = document.getElementById('cfg-kc-client').value.trim();
+  persistCfg();
+  document.getElementById('reader-badge').textContent = cfg.reader;
+  closeCfg();
+  toast('Configuración guardada', 'ok');
+}
+function persistCfg() {
+  localStorage.setItem('air_api',      cfg.api);
+  localStorage.setItem('air_reader',   cfg.reader);
+  localStorage.setItem('air_kc_url',   cfg.kcUrl);
+  localStorage.setItem('air_kc_realm', cfg.kcRealm);
+  localStorage.setItem('air_kc_client',cfg.kcClient);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════════
+function goTab(name, li) {
+  document.querySelectorAll('.app-tabs li').forEach(l => l.classList.remove('is-active'));
+  if (li) li.classList.add('is-active');
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name)?.classList.add('active');
+  if (name === 'flights')   loadFlights();
+  if (name === 'baggage')   loadBaggage();
+  if (name === 'incidents') loadIncidents();
+  if (name === 'reports')   loadReports();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LOGOUT
+// ═══════════════════════════════════════════════════════════════════
+function doLogout() {
+  if (keycloak && !demo) keycloak.logout({ redirectUri: location.href });
+  else location.reload();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════════
+function emptyState(icon, msg) {
+  return `<div style="text-align:center;padding:44px;color:var(--dim)"><i class="fa-solid ${icon}" style="font-size:26px;display:block;margin-bottom:10px;opacity:.3"></i>${msg}</div>`;
+}
+
+function toast(msg, type = 'ok') {
+  const ICONS = { ok:'check-circle', warn:'triangle-exclamation', err:'circle-xmark' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<i class="fa-solid fa-${ICONS[type]}"></i> ${msg}`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT — try to auto-reconnect Keycloak if already configured
+// ═══════════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  const savedKcUrl = localStorage.getItem('air_kc_url');
+  if (savedKcUrl) {
+    document.getElementById('kc-url').value    = savedKcUrl;
+    document.getElementById('kc-realm').value  = localStorage.getItem('air_kc_realm') || 'airport-rfid';
+    document.getElementById('kc-client').value = localStorage.getItem('air_kc_client') || 'rfid-frontend';
+    document.getElementById('kc-api').value    = localStorage.getItem('air_api') || '/api/v1';
+    setAuthMsg('Conectando con Keycloak…', true);
+    doInitKeycloak();
+  } else {
+    setAuthMsg('Configura el servidor para continuar', false);
+    document.getElementById('auth-form').style.display = 'block';
+  }
+});
+</script>
+</body>
+</html>

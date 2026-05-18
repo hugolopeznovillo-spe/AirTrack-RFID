@@ -1,0 +1,80 @@
+services:
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: airtrack-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: airtrack
+      POSTGRES_USER: airtrack
+      POSTGRES_PASSWORD: airtrack_secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airtrack"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Keycloak ──────────────────────────────────────────────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.3
+    container_name: airtrack-keycloak
+    restart: unless-stopped
+    command: start-dev --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/airtrack
+      KC_DB_USERNAME: airtrack
+      KC_DB_PASSWORD: airtrack_secret
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8080
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── Backend FastAPI ───────────────────────────────────────────────────────
+  backend:
+    build: ./backend
+    container_name: airtrack-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://airtrack:airtrack_secret@postgres:5432/airtrack
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: airport-rfid
+      KEYCLOAK_CLIENT_ID: rfid-backend
+      KEYCLOAK_ADMIN_USER: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      CORS_ORIGINS: "http://localhost,http://localhost:3000,http://localhost:8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+
+  # ── Frontend Nginx ────────────────────────────────────────────────────────
+  frontend:
+    image: nginx:alpine
+    container_name: airtrack-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

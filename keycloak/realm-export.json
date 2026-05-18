@@ -1,0 +1,75 @@
+{
+  "realm": "airport-rfid",
+  "enabled": true,
+  "displayName": "AirTrack RFID",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "accessTokenLifespan": 3600,
+  "refreshTokenMaxReuse": 0,
+  "clients": [
+    {
+      "clientId": "rfid-frontend",
+      "name": "AirTrack Frontend",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "protocol": "openid-connect",
+      "redirectUris": ["http://localhost/*", "http://localhost:80/*"],
+      "webOrigins": ["http://localhost", "http://localhost:80"],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost/*"
+      }
+    },
+    {
+      "clientId": "rfid-backend",
+      "name": "AirTrack Backend",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "bearerOnly": true,
+      "protocol": "openid-connect"
+    }
+  ],
+  "roles": {
+    "realm": [
+      { "name": "admin",    "description": "Administrador del sistema" },
+      { "name": "operator", "description": "Operador de pista / handling" },
+      { "name": "viewer",   "description": "Solo lectura" }
+    ]
+  },
+  "users": [
+    {
+      "username": "admin",
+      "email": "admin@airport.local",
+      "firstName": "Admin",
+      "lastName": "AirTrack",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "admin123", "temporary": false }],
+      "realmRoles": ["admin", "operator", "viewer"]
+    },
+    {
+      "username": "Hlopez",
+      "email": "hlopez@airport.local",
+      "firstName": "Hernán",
+      "lastName": "López",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "hlopez123", "temporary": false }],
+      "realmRoles": ["operator", "viewer"]
+    },
+    {
+      "username": "Mvillegas",
+      "email": "mvillegas@airport.local",
+      "firstName": "Mariana",
+      "lastName": "Villegas",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "mvillegas123", "temporary": false }],
+      "realmRoles": ["operator", "viewer"]
+    }
+  ]
+}
